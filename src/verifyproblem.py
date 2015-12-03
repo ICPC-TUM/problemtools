@@ -1089,3 +1089,4 @@ if __name__ == '__main__':
     with Problem(args.problemdir) as prob:
         [errors, warnings] = prob.check(args)
         print "%s tested: %d errors, %d warnings" % (prob.shortname, errors, warnings)
+        exit(errors)
