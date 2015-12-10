@@ -55,7 +55,7 @@ class Runnable:
         status, runtime = self._run_wait(runcmd + args, infile, outfile, errfile, timelim)
 
         self.runtime = max(self.runtime, runtime)
-
+        
         return status, runtime
 
     def _run_wait(self, argv, infile="/dev/null", outfile="/dev/null", errfile="/dev/null", timelim=1000):
@@ -316,14 +316,19 @@ class Program(Runnable):
             self._compiler_result = True
             return True
 
-        compiler = (Program._COMPILE[self.lang] + ' > /dev/null 2> /dev/null') % self.__dict__
+        compiler = (Program._COMPILE[self.lang] + ' > /dev/null 2> errors') % self.__dict__
         logging.debug('compile: %s', compiler)
         status = os.system(compiler)
 
         if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
             logging.debug('Compiler failed (status %d) when compiling %s\n        Command used:\n%s' % (status, self.name, compiler))
+            logging.info('Error output of the compiler:')
+            with open('errors', 'r') as fin: logging.info(fin.read())                
             self._compile_result = False
+            os.remove('errors')
             return False
+            
+        os.remove('errors')
 
         if self.lang == 'dir':
             run = Program._RUN[self.lang] % {'path': self.path}

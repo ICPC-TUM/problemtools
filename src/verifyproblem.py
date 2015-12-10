@@ -205,13 +205,16 @@ class TestCase(ProblemAspect):
         if self._problem.is_interactive:
             res2 = self._problem.output_validators.validate_interactive(self, sub, timelim_high, self._problem.submissions)
         else:
-            status, runtime = sub.run(self.infile, outfile, timelim=timelim_high+1, logger=self)
+            status, runtime = sub.run(self.infile, outfile, timelim=timelim_high+1, logger=self, errfile='errors')
             if is_TLE(status) or runtime > timelim_high:
                 res2 = SubmissionResult('TLE', score=self._problem.config.get('grading')['reject_score'])
             elif is_RTE(status):
                 res2 = SubmissionResult('RTE', score=self._problem.config.get('grading')['reject_score'])
+                logging.info('Error output of the submission:')
+                with open('errors', 'r') as fin: logging.info(fin.read())
             else:
                 res2 = self._problem.output_validators.validate(self, outfile, self._problem.submissions)
+            os.remove('errors')
             res2.runtime = runtime
         if sys.stdout.isatty():
             sys.stdout.write('%s' % '\b' * (len(msg)))
@@ -680,11 +683,16 @@ class InputFormatValidators(ProblemAspect):
                     status, runtime = val.run(self._random_input, args=flags, logger=self)
                     if os.WEXITSTATUS(status) == 42:
                         testcase.testcasegroup.warning("The validator flags of %s and validator %s does not reject random input" % (testcase.testcasegroup, val))
-                status, runtime = val.run(testcase.infile, args=flags, logger=self)
+                status, runtime = val.run(testcase.infile, args=flags, logger=self, errfile='errors')
                 if not os.WIFEXITED(status):
                     testcase.error('Input format validator %s crashed on input %s' % (val, testcase.infile))
+                    testcase.info('Error output of the validator:')
+                    with open('errors', 'r') as fin: testcase.info(fin.read())
                 if os.WEXITSTATUS(status) != 42:
                     testcase.error('Input format validator %s did not accept input %s, exit code: %d' % (val, testcase.infile, os.WEXITSTATUS(status)))
+                    testcase.info('Error output of the validator:')
+                    with open('errors', 'r') as fin: logging.info(fin.read())
+                os.remove('errors')
 
 
 class Graders(ProblemAspect):
@@ -820,6 +828,8 @@ class OutputValidators(ProblemAspect):
         if ret == 43:
             if score is None:
                 score = self._problem.config.get('grading')['reject_score']
+            logging.info('Error output of the validator:')
+            with open(os.path.join(feedbackdir, 'judgemessage.txt'), 'r') as fin: logging.info(fin.read())
             return SubmissionResult('WA', score=score)
         if score is None:
             score = self._problem.config.get('grading')['accept_score']
