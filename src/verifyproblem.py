@@ -214,7 +214,8 @@ class TestCase(ProblemAspect):
                 with open('errors', 'r') as fin: logging.info(fin.read())
             else:
                 res2 = self._problem.output_validators.validate(self, outfile, self._problem.submissions)
-            os.remove('errors')
+            if os.path.isfile('errors'):
+                os.remove('errors')
             res2.runtime = runtime
         if sys.stdout.isatty():
             sys.stdout.write('%s' % '\b' * (len(msg)))
@@ -692,7 +693,8 @@ class InputFormatValidators(ProblemAspect):
                     testcase.error('Input format validator %s did not accept input %s, exit code: %d' % (val, testcase.infile, os.WEXITSTATUS(status)))
                     testcase.info('Error output of the validator:')
                     with open('errors', 'r') as fin: logging.info(fin.read())
-                os.remove('errors')
+                if os.path.isfile('errors'):
+                    os.remove('errors')
 
 
 class Graders(ProblemAspect):

@@ -325,10 +325,12 @@ class Program(Runnable):
             logging.info('Error output of the compiler:')
             with open('errors', 'r') as fin: logging.info(fin.read())                
             self._compile_result = False
-            os.remove('errors')
+            if os.path.isfile('errors'):
+                os.remove('errors')
             return False
             
-        os.remove('errors')
+        if os.path.isfile('errors'):
+            os.remove('errors')
 
         if self.lang == 'dir':
             run = Program._RUN[self.lang] % {'path': self.path}
