@@ -62,13 +62,6 @@ class Template:
             templatefile = 'template_sol.tex'
             clsfile = 'solution.cls'
 
-        # timelim = 1  # Legacy for compatibility with v0.1
-        # version = detect_version(problemdir, problemtex)
-        # if version != '':
-        #     print 'Note: problem is in an old version (%s) of problem format, you should consider updating it' % version
-        #     templatefile = 'template_%s.tex' % version
-        #     clsfile = 'problemset_%s.cls' % version
-
         templatepaths = [os.path.join(os.path.dirname(__file__), 'templates/latex'),
                          os.path.join(os.path.dirname(__file__), '../templates/latex'),
                          '/usr/lib/problemtools/templates/latex']
