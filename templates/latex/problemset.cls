@@ -190,6 +190,7 @@
 }
 
 \newcommand{\problemheader}[2]{
+  \addcontentsline{toc}{section}{\if@problemnumbers {\problemnumber \qquad} #1}
   \begin{center}
     \textsf{
       \if@problemnumbers {\huge Problem \problemnumber\\[3mm]}  \fi
@@ -204,9 +205,9 @@
       \\[5mm]
     }
   \end{center}
-  \addtocontents{toc}{
-    \if@problemnumbers \problemnumber \fi
-    & \@problemname \\}%
+%  \addtocontents{toc}{
+%    \if@problemnumbers \problemnumber \fi
+%    & \@problemname \\}%
 }
 
 %% Commands related to sample data
@@ -326,15 +327,15 @@
   \pagestyle{problem}
 
   % Set up table of contents for cover page
-  \addtocontents{toc}{\protect\begin{tabular}{cl}}
+%  \addtocontents{toc}{\protect\begin{tabular}{cl}}
 }
 
-\AtEndDocument{
-  \clearproblemsetpage
+%\AtEndDocument{
+%  \clearproblemsetpage
   % Annoyingly enough addtocontents won't work at end of doc
-  \immediate\write\@auxout{%
-    \string\@writefile{toc}{\string\end{tabular}}%
-  }
-}
+%  \immediate\write\@auxout{%
+%    \string\@writefile{toc}{\string\end{tabular}}%
+%  }
+%}
 
 \fi
