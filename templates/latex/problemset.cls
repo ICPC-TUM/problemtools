@@ -98,8 +98,6 @@
                                      {1.7ex}%
                                      {\normalfont\normalsize\sf\bfseries}}
 
-\renewcommand{\contentsname}{Problems}
-
 
 % TODO: make last command of illustration optional
 \newcommand{\illustration}[3]{
@@ -205,9 +203,6 @@
       \\[5mm]
     }
   \end{center}
-%  \addtocontents{toc}{
-%    \if@problemnumbers \problemnumber \fi
-%    & \@problemname \\}%
 }
 
 %% Commands related to sample data
@@ -300,7 +295,7 @@
   \par
 }
 
-% Remaining part of file is headers and toc, not tested with plasTeX
+% Remaining part of file is headers, not tested with plasTeX
 % and should not be used in plastex mode
 \ifplastex\else
 
@@ -326,16 +321,6 @@
   \renewcommand{\headrulewidth}{0pt}
   \pagestyle{problem}
 
-  % Set up table of contents for cover page
-%  \addtocontents{toc}{\protect\begin{tabular}{cl}}
 }
-
-%\AtEndDocument{
-%  \clearproblemsetpage
-  % Annoyingly enough addtocontents won't work at end of doc
-%  \immediate\write\@auxout{%
-%    \string\@writefile{toc}{\string\end{tabular}}%
-%  }
-%}
 
 \fi
