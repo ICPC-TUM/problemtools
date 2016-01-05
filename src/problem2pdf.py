@@ -19,11 +19,12 @@ def convert(problem, options=None):
     destfile = Template(options.destfile).safe_substitute(problem=problembase)
 
     texfile = problem
+
     # Set up template if necessary
     templ = None
     if os.path.isdir(problem):
         templ = template.Template(problem, language=options.language,
-                                  title=options.title)
+                                  title=options.title, solution=options.solution)
         texfile = templ.get_file_name()
 
     origcwd = os.getcwd()
@@ -63,6 +64,8 @@ class ConvertOptions:
          'choose alternate language (2-letter code).'],
         ['nopdf', 'store_true', '-n', '--no-pdf',
          'run pdflatex in -draftmode'],
+        ['solution', 'store_true', '-s', '--solution',
+         'build solution instead of problem']
         ]
 
     def __init__(self):
@@ -71,6 +74,7 @@ class ConvertOptions:
         self.quiet = False
         self.language = ""
         self.nopdf = False
+        self.solution = False
 
 
 if __name__ == '__main__':
