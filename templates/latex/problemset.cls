@@ -188,7 +188,7 @@
 }
 
 \newcommand{\problemheader}[2]{
-  \addcontentsline{toc}{section}{\if@problemnumbers {\problemnumber \qquad} #1}
+  \addcontentsline{toc}{section}{\if@problemnumbers {\problemnumber \qquad}\fi #1}
   \begin{center}
     \textsf{
       \if@problemnumbers {\huge Problem \problemnumber\\[3mm]}  \fi
