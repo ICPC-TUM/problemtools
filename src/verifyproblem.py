@@ -19,6 +19,18 @@ from program import Executable, Program, ValidationScript, ProgramError, Program
 import problem2pdf
 import problem2html
 
+def copytree(src, dst, symlinks=False, ignore=None):
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            copytree(s, d, symlinks, ignore)
+        else:
+            if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
+                shutil.copy2(s, d)
+
 
 def get_programs(dir, tmpdir, pattern='.*', allow_validation_scripts=False, includedir=None, error_handler=logging):
     if not os.path.isdir(dir):
@@ -126,6 +138,7 @@ class ProblemAspect:
     warnings = 0
     bail_on_error = False
     _check_res = None
+    silent=False
 
     def error(self, msg):
         self._check_res = False
@@ -139,7 +152,17 @@ class ProblemAspect:
         logging.warning('in %s: %s' % (self, msg))
 
     def msg(self, msg):
-        print msg
+        if not ProblemAspect.silent:
+            print msg
+
+    def deletablemsg(self,msg):
+        if not ProblemAspect.silent:
+            sys.stdout.write('%s'%msg)
+            sys.stdout.flush()
+
+    def deletemsg(self,msg):
+        if not ProblemAspect.silent:
+            sys.stdout.write('%s' % '\b' * (len(msg)))
 
     def info(self, msg):
         logging.info(': %s' % (msg))
@@ -200,8 +223,9 @@ class TestCase(ProblemAspect):
         outfile = os.path.join(self._problem.tmpdir, 'output')
         if sys.stdout.isatty():
             msg = 'Running %s on %s...' % (sub.name, self)
-            sys.stdout.write('%s' % msg)
-            sys.stdout.flush()
+            #sys.stdout.write('%s' % msg)
+            #sys.stdout.flush()
+            self.deletablemsg(msg)
         if self._problem.is_interactive:
             res2 = self._problem.output_validators.validate_interactive(self, sub, timelim_high, self._problem.submissions)
         else:
@@ -218,7 +242,8 @@ class TestCase(ProblemAspect):
                 os.remove('errors')
             res2.runtime = runtime
         if sys.stdout.isatty():
-            sys.stdout.write('%s' % '\b' * (len(msg)))
+            #sys.stdout.write('%s' % '\b' * (len(msg)))
+            self.deletemsg(msg)
         if res2.runtime <= timelim_low:
             res1 = res2
         else:
@@ -372,7 +397,7 @@ class TestCaseGroup(ProblemAspect):
             return self._problem.graders.grade(self, sub_results, shadow_result)
         return SubmissionResult(verdict, subresults=sub_results, reason=reason)
 
-    def run_submission(self, sub, args, timelim_low, timelim_high):
+    def run_submission(self, sub, args, timelim_low=1000, timelim_high=1000):
         self.info('Running on %s' % self)
         subres1 = []
         subres2 = []
@@ -901,6 +926,7 @@ class OutputValidators(ProblemAspect):
 
     def validate(self, testcase, submission_output, errorhandler):
         res = SubmissionResult('JE')
+        lastfeedback=os.path.join(self._problem.tmpdir,"lastfeedback")
         for val in self._actual_validators():
             if val is not None and val.compile():
                 feedbackdir = tempfile.mkdtemp(prefix='feedback', dir=self._problem.tmpdir)
@@ -909,6 +935,7 @@ class OutputValidators(ProblemAspect):
                                           logger=self)
 
                 res = self._parse_validator_results(val, status, feedbackdir, errorhandler)
+                copytree(feedbackdir,lastfeedback)
                 shutil.rmtree(feedbackdir)
                 if res.verdict != 'AC':
                     return res
