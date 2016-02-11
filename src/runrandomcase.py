@@ -154,10 +154,11 @@ class Fuzzer:
 
 	@staticmethod
 	def default_args():
-		return argparser().parse_args([None])
+		return Fuzzer.argparser().parse_args([None,None])
 
 
 if __name__ == '__main__':
+	args = Fuzzer.default_args()
 	args = Fuzzer.argparser().parse_args()
 	#args.data_filter=re.compile(".*")
 	args.data_filter=re.compile("data/" + args.case + "$")
