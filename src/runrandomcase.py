@@ -92,7 +92,7 @@ class Fuzzer:
 				args.data_filter=re_argument(args.case +"_" + seed)
 				(result1, result2) = testdata.run_submission(program,args)
 
-				if str(result1)[:2] != 0:
+				if str(result1)[:2] != 'AC':
 					logger.debug("found problematic input, picking failing case")
 					feedbackdir = os.path.join(prob.tmpdir,"lastfeedback")
 					judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
@@ -106,7 +106,7 @@ class Fuzzer:
 					logger.debug("running problem again on singular case")
 					(result1, result2) = testdata.run_submission(program,args)
 
-					if str(result1)[:2] != 0:
+					if str(result1)[:2] != 'AC':
 						failed += 1
 						if args.failpath is not None:
 							for ext in ['seed','in','ans']:
