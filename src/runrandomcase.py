@@ -1,176 +1,24 @@
 #! /usr/bin/env python2
-# -*- coding: utf-8 -*-
-import glob
-import string
-import hashlib
-import collections
+from verifyproblem import Problem,ProblemAspect,TestCaseGroup,Submissions,re_argument
+from program import Program
+import subprocess
 import os
-import errno
-import signal
 import re
 import shutil
 import logging
-import yaml
-import tempfile
 import sys
-import copy
 import random
 from argparse import ArgumentParser, ArgumentTypeError
-from program import Executable, Program, ValidationScript, ProgramError, ProgramWarning, locate_program
-from verifyproblem import *
-import random
+from pickcase import Picker
 
 from timeit import default_timer as timer
 
-
-#NEW METHODS FOR PROBLEM
-def newenter(self):
-	self.tmpdir = tempfile.mkdtemp(prefix='verify-%s-'%self.shortname)
-	if not os.path.isdir(self.probdir):
-		self.error("Problem directory '%s' not found" % self.probdir)
-		self.shortname = None
-		return self
-
-	self.statement = ProblemStatement(self)
-	self.config = ProblemConfig(self)
-	self.output_validators = OutputValidators(self)
-	self.testdata = TestCaseGroup(self, os.path.join(self.probdir, 'data'))
-	self.submissions=None
-	self.is_interactive = False
-	return self
-
-def runRandomCase(self,args,logger,failpath):
-	if self.shortname is None:
-		return [1, 0]
-	if args is None:
-		args = default_args()
-
-	try:
-		if not re.match('^[a-z0-9]+$', self.shortname):
-			logger.error("Invalid shortname '%s' (must be [a-z0-9]+)" % self.shortname)
-
-		#here is the actual testing
-
-		#first locate and compile sample sol and generator
-		srcdir = os.path.join(self.probdir, 'submissions')
-		samplesol = get_programs(os.path.join(srcdir, 'accepted'),
-			self.tmpdir, pattern=Submissions._SUB_REGEXP, error_handler=self)[0]
-
-		generator =	get_programs(os.path.join(self.probdir,'generators'),
-			self.tmpdir,error_handler=self)[0]
-
-		logger.info('Compiling sample solution %s' % (samplesol.name))
-		if not samplesol.compile():
-			logger.error('Compile error for sample solution %s' % (samplesol.name))
-			return
-
-		logger.info('Compiling generator %s' % (generator.name))
-		if not generator.compile():
-			logger.error('Compile error for generator %s' % (generator.name))
-			return
-
-		#compile the program
-		program = Program(os.path.realpath(args.solution), self.tmpdir)
-		logger.info('Compiling program %s' % (program.name))
-
-		if not program.compile():
-			logger.error('Compile error for program %s' % (program.name))
-			return
-
-		#check fail destination
-		if not os.path.isdir(failpath):
-			logger.error('fail destination is not a directory')
-			return
-
-		if not os.access(failpath, os.W_OK):
-			logger.error('could not write to fail destination')
-			return
-
-		#locate and copy test case
-
-		datadir = os.path.join(self.probdir, 'data')
-		secretdir = os.path.join(datadir, 'secret')
-		casefile = os.path.join(secretdir,args.case + '.seed')
-
-		if not os.path.isfile(casefile):
-			self.error('Could not locate seed file %s' % (casefile))
-			return
-
-		tmpdatadir = os.path.join(self.tmpdir,'data')
-		
-		os.mkdir(tmpdatadir)
-
-		logger.info('finished 0 runs of %s on %s (0 failed)' % (args.runs, args.case))
-		
-		failed=0
-		randomized = os.path.join(tmpdatadir,args.case)
-		
-		for i in range(args.runs):
-			#copy and randomize case
-			logger.debug("randomizing seed for %s" % args.case)		
-			Fuzzer._randomizeCase(casefile,randomized + ".seed")
-
-			#generate infile
-			logger.debug("generating randomized test case in/ans")
-			generator.run(randomized + '.seed', randomized + '.in',timelim=100, logger=None, errfile='errors')
-
-			samplesol.run(randomized + '.in', randomized + '.ans',timelim=100, logger=None, errfile='errors')
-
-			logger.debug("run program %s" % program.name)
-			testcasegroup = TestCaseGroup(self,tmpdatadir)
-
-			(result1, result2) = testcasegroup.run_submission(program,args)
-			logger.debug('verdict: %s' % (result1))
-
-			if str(result1)[:2] != "AC":
-				failed += 1
-				for ext in ['.seed','.in','.ans']:
-					dest = os.path.join(failpath,"fail" + str(failed) + ext)
-					shutil.copy(randomized + ext, dest)
-				output = os.path.join(self.tmpdir,"output")
-				outputdest = os.path.join(failpath,"fail" + str(failed) + ".out")
-				shutil.copy(output, outputdest)
-				feedbackdir = os.path.join(self.tmpdir,"lastfeedback")
-				judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
-				judgemessagedest = os.path.join(failpath,"fail" + str(failed) + ".judgemessage")
-				shutil.copy(judgemessage, judgemessagedest)
-				diffposition = os.path.join(feedbackdir,"diffposition.txt")
-				if os.path.isfile(diffposition):
-					diffpositiondest = os.path.join(failpath,"fail" + str(failed) + ".diffposition")
-					shutil.copy(diffposition, diffpositiondest)
-
-			logger.info('finished %s runs of %s on %s (%s failed)' % (i+1,args.runs, args.case, failed))
-
-			if failed >= 5:
-				logger.info('five runs failed, ending run')
-				return
-
-	except VerifyError:
-		pass
-
-#silence verifyproblem
-def newinit(self):
-	silent=True
-
-#forcing symlinks
-def force_symlink(file1, file2):
-    try:
-        os.symlink(file1, file2)
-    except OSError, e:
-        if e.errno == errno.EEXIST:
-            os.remove(file2)
-            os.symlink(file1, file2)
-
-#the fuzzer class
 class Fuzzer:
-	def __init__(self):
-		Problem.__enter__ = newenter
-		Problem.runRandomCase = runRandomCase
-		#ProblemAspect.__init__=newinit
-		ProblemAspect.silent=True
+	RANDOMIZED_CASES=50
+	MAX_FAILS = 5
 
 	@staticmethod
-	def _randomizeCase(original,randomized):
+	def _randomizeCase(original,randomized,cases,seed):
 		with open(original, 'r') as f1:
 			with open(randomized, 'w+') as f2:
 				lines = f1.readlines()
@@ -178,49 +26,135 @@ class Fuzzer:
 				for i, line in enumerate(lines):
 					if not line.startswith('#'):
 						if written == 0:
-							f2.write("4\n")
+							f2.write(str(cases) + "\n")
 						elif written == 1:
-							f2.write(str(random.getrandbits(63)) + "\n")
+							f2.write(seed + "\n")
 						else:
 							f2.write(line)
 						written += 1
 
-	def checkFuzzy(self,args,logger,failpath):
-		#prepare the checker
-		checkerdir = os.path.join(args.problemdir, "output_validators")
-		dst = os.path.join(checkerdir, "checker")
-		if (os.path.isdir(checkerdir)):
-			maindir = os.path.dirname(os.path.dirname(args.problemdir))
-			utildir = os.path.join(maindir,"util")
-			frameworkdir = os.path.join(utildir,"checkers")
-			frameworksrcdir = os.path.join(frameworkdir,"src")
-			frameworksrc = os.path.join(frameworksrcdir,"*")
-			for src in glob.glob(frameworksrc):
-				folder=os.path.basename(os.path.normpath(src))
-				force_symlink(os.path.abspath(src), os.path.abspath(os.path.join(dst, folder)))
-		with Problem(args.problemdir) as prob:
-			prob.runRandomCase(args,logger,failpath)
+	@staticmethod
+	def runRandomCase(args, logger):
+		args.bail_on_error=False
+		args.parts=["submissions"]
+		ProblemAspect.silent=True
 
-		if (os.path.isdir(checkerdir)):
-			for src in glob.glob(os.path.join(dst,"*")):
-				if os.path.islink(src):
-					os.unlink(src)
+		with Problem(args.problemdir) as prob:
+			datadir = os.path.join(prob.probdir, 'data')
+			secretdir = os.path.join(datadir, 'secret')
+			casefile = os.path.join(secretdir,args.case + '.seed')
+
+			if not os.path.isfile(casefile):
+				logger.error('Could not locate seed file %s' % (casefile))
+				return
+
+			if args.failpath is not None:
+				if not os.path.isdir(args.failpath):
+					logger.error('fail destination is not a directory')
+					return
+				if not os.access(args.failpath, os.W_OK):
+					logger.error('could not write to fail destination')
+					return
+
+			program = Program(os.path.realpath(args.solution), prob.tmpdir)
+			logger.info('Compiling program %s' % (program.name))
+
+			if not program.compile():
+				logger.error('Compile error for program %s' % (program.name))
+				return
+
+
+			#prepare the things we will need
+			logger.info("preparing")
+			subprocess.call(["make","generator"])
+			subprocess.call(["make","anysolution"])
+
+			FNULL = open(os.devnull, 'w')
+
+			failed=0
+			logger.info('finished %s runs of %s on %s (%s failed)' % (0,args.runs, args.case, 0))
+			for i in range(args.runs):
+				seed=str(random.getrandbits(63))
+				randomized={}
+				for ext in ['seed','in','ans']:
+					randomized[ext] = os.path.join(secretdir,args.case + "_" + seed + "." + ext)
+
+				logger.debug("randomizing %s"%(args.case))
+				Fuzzer._randomizeCase(casefile,randomized["seed"],Fuzzer.RANDOMIZED_CASES,seed)
+				#generate in and out file
+				subprocess.call(["make",randomized["in"]],stdout=FNULL, stderr=subprocess.STDOUT)
+				subprocess.call(["make",randomized["ans"]],stdout=FNULL, stderr=subprocess.STDOUT)
+				#update testdata
+				testdata = TestCaseGroup(prob, os.path.join(prob.probdir, 'data'))
+				
+				#run problemtools
+				logger.debug("preparing and running problem tools")
+				args.data_filter=re_argument(args.case +"_" + seed)
+				(result1, result2) = testdata.run_submission(program,args)
+
+				if str(result1)[:2] != 0:
+					logger.debug("found problematic input, picking failing case")
+					feedbackdir = os.path.join(prob.tmpdir,"lastfeedback")
+					judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
+					case = Picker.pickcase(randomized["in"],Picker.firstfailingcase(judgemessage,randomized["ans"]))
+					with open(randomized["in"],'w+') as f:
+						f.write("1\n")
+						for line in case:
+							f.write(line)
+					subprocess.call(["make",randomized["ans"]],stdout=FNULL, stderr=subprocess.STDOUT)
+					
+					logger.debug("running problem again on singular case")
+					(result1, result2) = testdata.run_submission(program,args)
+
+					if str(result1)[:2] != 0:
+						failed += 1
+						if args.failpath is not None:
+							for ext in ['seed','in','ans']:
+								dest = os.path.join(args.failpath,"fail" + str(failed) + "." + ext)
+								shutil.copy(randomized[ext], dest)
+							output = os.path.join(prob.tmpdir,"output")
+							outputdest = os.path.join(args.failpath,"fail" + str(failed) + ".out")
+							shutil.copy(output, outputdest)
+							judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
+							judgemessagedest = os.path.join(args.failpath,"fail" + str(failed) + ".judgemessage")
+							shutil.copy(judgemessage, judgemessagedest)
+							diffposition = os.path.join(feedbackdir,"diffposition.txt")
+							if os.path.isfile(diffposition):
+								diffpositiondest = os.path.join(args.failpath,"fail" + str(failed) + ".diffposition")
+								shutil.copy(diffposition, diffpositiondest)
+						else:
+							logger.info("found failing case:")
+							with open(randomized['in']) as f:
+								for line in f.readlines():
+									logger.info(line)
+					else :
+						print "Solution has feedback errors between test cases"
+						return
+				
+				logger.info('finished %s runs of %s on %s (%s failed)' % (i+1,args.runs, args.case, failed))
+				
+				if failed >= Fuzzer.MAX_FAILS:
+					logger.info('enough runs failed, ending run')
+					return
+
+				for ext in ['seed','in','ans']:
+					os.remove(randomized[ext])
 
 	@staticmethod
 	def argparser():
-		parser = ArgumentParser(description="Validate a problem package in the Kattis problem format.")
-		parser.add_argument("-s", "--submission_filter", metavar='SUBMISSIONS', help="run only submissions whose name contains this regex.  The name includes category (accepted, wrong_answer, etc), e.g. 'accepted/hello.java' (for a single file submission) or 'wrong_answer/hello' (for a directory submission)", type=re_argument, default=re.compile('.*'))
+		parser = ArgumentParser(description="Run randomized cases")
 		parser.add_argument("-t", "--fixed_timelim", help="use this fixed time limit (useful in combination with -d and/or -s when all AC submissions might not be run on all data)", type=int)
 		parser.add_argument("-l", "--log-level", dest="loglevel", help="set log level (debug, info, warning, error, critical)", default="info")
-		parser.add_argument("-r", "--runs", dest="runs", help="", default=10)
-		parser.add_argument("-c", "--case", dest="case", help="", default="small1")
+		parser.add_argument("-r", "--runs", dest="runs", help="set the number of runs", default=10)
+		parser.add_argument("-c", "--case", dest="case", help="set the base case which is then randomized", default="small1")
+		parser.add_argument("-f", "--failpath", dest="failpath",help="set the path where the failing cases should be stored", default=None)
 		parser.add_argument('problemdir')
 		parser.add_argument('solution')
 		return parser
 
 	@staticmethod
 	def default_args():
-		return Fuzzer.argparser().parse_args([None])
+		return argparser().parse_args([None])
 
 
 if __name__ == '__main__':
@@ -230,12 +164,10 @@ if __name__ == '__main__':
 	fmt = "%(levelname)s %(message)s"
 	#silence verifyproblem
 	logging.basicConfig(stream=sys.stdout,
-						format=fmt,
-						level=eval("logging.CRITICAL"))
+	 					format=fmt,
+	 					level=eval("logging.CRITICAL"))
 
 	logger=logging.getLogger("fuzzylogger")
 	logger.setLevel(eval("logging." + args.loglevel.upper()))
 
-	print 'Loading problem %s' % os.path.basename(os.path.realpath(args.problemdir))
-	f = Fuzzer()
-	f.checkFuzzy(args, logger, "fail")
+	Fuzzer.runRandomCase(args,logger)
