@@ -133,12 +133,12 @@ class Fuzzer:
 				
 				logger.info('finished %s runs of %s on %s (%s failed)' % (i+1,args.runs, args.case, failed))
 				
+				for ext in ['seed','in','ans']:
+					os.remove(randomized[ext])
+
 				if failed >= Fuzzer.MAX_FAILS:
 					logger.info('enough runs failed, ending run')
 					return
-
-				for ext in ['seed','in','ans']:
-					os.remove(randomized[ext])
 
 	@staticmethod
 	def argparser():
