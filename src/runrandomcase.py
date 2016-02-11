@@ -5,6 +5,7 @@ import string
 import hashlib
 import collections
 import os
+import errno
 import signal
 import re
 import shutil
@@ -18,6 +19,9 @@ from argparse import ArgumentParser, ArgumentTypeError
 from program import Executable, Program, ValidationScript, ProgramError, ProgramWarning, locate_program
 from verifyproblem import *
 import random
+
+from timeit import default_timer as timer
+
 
 #NEW METHODS FOR PROBLEM
 def newenter(self):
@@ -129,10 +133,11 @@ def runRandomCase(self,args,logger,failpath):
 				feedbackdir = os.path.join(self.tmpdir,"lastfeedback")
 				judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
 				judgemessagedest = os.path.join(failpath,"fail" + str(failed) + ".judgemessage")
-				diffposition = os.path.join(feedbackdir,"diffposition.txt")
-				diffpositiondest = os.path.join(failpath,"fail" + str(failed) + ".diffposition")
 				shutil.copy(judgemessage, judgemessagedest)
-				shutil.copy(diffposition, diffpositiondest)
+				diffposition = os.path.join(feedbackdir,"diffposition.txt")
+				if os.path.isfile(diffposition):
+					diffpositiondest = os.path.join(failpath,"fail" + str(failed) + ".diffposition")
+					shutil.copy(diffposition, diffpositiondest)
 
 			logger.info('finished %s runs of %s on %s (%s failed)' % (i+1,args.runs, args.case, failed))
 
@@ -146,6 +151,15 @@ def runRandomCase(self,args,logger,failpath):
 #silence verifyproblem
 def newinit(self):
 	silent=True
+
+#forcing symlinks
+def force_symlink(file1, file2):
+    try:
+        os.symlink(file1, file2)
+    except OSError, e:
+        if e.errno == errno.EEXIST:
+            os.remove(file2)
+            os.symlink(file1, file2)
 
 #the fuzzer class
 class Fuzzer:
@@ -164,7 +178,7 @@ class Fuzzer:
 				for i, line in enumerate(lines):
 					if not line.startswith('#'):
 						if written == 0:
-							f2.write("1\n")
+							f2.write("4\n")
 						elif written == 1:
 							f2.write(str(random.getrandbits(63)) + "\n")
 						else:
@@ -172,8 +186,25 @@ class Fuzzer:
 						written += 1
 
 	def checkFuzzy(self,args,logger,failpath):
+		#prepare the checker
+		checkerdir = os.path.join(args.problemdir, "output_validators")
+		dst = os.path.join(checkerdir, "checker")
+		if (os.path.isdir(checkerdir)):
+			maindir = os.path.dirname(os.path.dirname(args.problemdir))
+			utildir = os.path.join(maindir,"util")
+			frameworkdir = os.path.join(utildir,"checkers")
+			frameworksrcdir = os.path.join(frameworkdir,"src")
+			frameworksrc = os.path.join(frameworksrcdir,"*")
+			for src in glob.glob(frameworksrc):
+				folder=os.path.basename(os.path.normpath(src))
+				force_symlink(os.path.abspath(src), os.path.abspath(os.path.join(dst, folder)))
 		with Problem(args.problemdir) as prob:
 			prob.runRandomCase(args,logger,failpath)
+
+		if (os.path.isdir(checkerdir)):
+			for src in glob.glob(os.path.join(dst,"*")):
+				if os.path.islink(src):
+					os.unlink(src)
 
 	@staticmethod
 	def argparser():
