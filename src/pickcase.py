@@ -3,6 +3,47 @@ import os
 
 class Picker:
 	@staticmethod
+	def splitcase(casefile,first):
+		if not os.path.isfile(casefile):
+			print 'Could not locate casefile file %s' % (casefile)
+			return
+
+		with open(casefile,'r') as f:
+			empty = sum(not line.strip() for line in f)
+			f.seek(0)
+			cases=int(f.readline())
+			half = cases/2
+
+			rest=[]
+
+			if first:
+				ret = [str(half)+"\n"]
+			else:
+				ret = [str(cases-half)+"\n"]
+
+			if not empty in [0,1,cases-1,cases]:
+				print "could not deduce testcase layout"
+				return []
+
+			if empty==1 or empty==cases:
+				#read and save preamble
+				ret = ret + Picker.readToEmpty(f) + ["\n"]
+				empty -= 1
+
+			for i in range(cases):
+				if (i<half)==first:
+					ret = ret + Picker.readCase(f,empty)
+					if empty:
+						ret += ["\n"]
+				else:
+					Picker.readCase(f,empty)
+
+			if empty:
+				#remove last empty line
+				ret.pop()
+			return ret
+
+	@staticmethod
 	def firstfailingcase(judgemessage,sol):
 		if not os.path.isfile(judgemessage):
 			print 'Could not locate judgemessage file %s' % (judgemessage)
@@ -32,6 +73,22 @@ class Picker:
 		return -1
 
 	@staticmethod
+	def readToEmpty(f):
+		res=[]
+		line = f.readline()
+		while line.strip():
+			res=res+[line]
+			line=f.readline()
+		return res
+
+	@staticmethod
+	def readCase(f,empty):
+		if (empty == 0):
+			return [f.readline()]
+		else:
+			return Picker.readToEmpty(f)
+
+	@staticmethod
 	def pickcase(casefile,caseno):
 		if not os.path.isfile(casefile):
 			print 'Could not locate casefile file %s' % (casefile)
@@ -42,44 +99,30 @@ class Picker:
 			f.seek(0)
 			cases=int(f.readline())
 
-			if empty==0:
-				lines = f.readlines()
-				for line in lines:
-					caseno -= 1
-					if caseno == 0:
-						return [line]
-			elif empty==1:
-				lines = f.readlines()
-				foundempty=False
-				for line in lines:
-					if not foundempty:
-						if not line.strip():
-							foundempty=True
-					else:
-						caseno -= 1
-						if caseno == 0:
-							return [line]
-			elif empty==cases-1:
-				empty += 1
-				caseno -= 1
-				#sad replacement for switch with fallthrough
-			if empty==cases:
-				lines = f.readlines()
-				ret=[]
-				for line in lines:
-					if not line.strip():
-						caseno -= 1
-						continue
-					if caseno == 0:
-						ret += [line]
-					if caseno < 0:
-						break
-				return ret
-			else:
-				print "Could not deduce testcase layout"
+			if caseno < 1 or caseno > cases:
+				print "invalid case number"
 				return []
 
+			if not empty in [0,1,cases-1,cases]:
+				print "could not deduce testcase layout"
+				return []
+
+			ret = ["1\n"]
+
+			if empty==1 or empty==cases:
+				#read and save preamble
+				ret = ret + Picker.readToEmpty(f) + ["\n"]
+				empty -= 1
+
+			for i in range(caseno-1):
+				Picker.readCase(f,empty)
+
+			ret = ret + Picker.readCase(f,empty)
+
+			return ret
+
 if __name__ == '__main__':
-	print Picker.pickcase("fail/fail1.in",Picker.firstfailingcase("fail/fail1.judgemessage","fail/fail1.ans"))
+	print Picker.splitcase("fail/fail1.in",True)
+	print Picker.splitcase("fail/fail1.in",False)
 	# for i in range(1,6):
 	# 	print firstfailingcase("fail/fail" + str(i) + ".judgemessage","fail/fail" + str(i) + ".ans")

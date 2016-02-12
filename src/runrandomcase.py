@@ -33,6 +33,39 @@ class Fuzzer:
 							f2.write(line)
 						written += 1
 
+	FNULL = open(os.devnull, 'w')
+
+	@staticmethod
+	def _callmake(folder,rule):
+		subprocess.call(["make",rule],stdout=Fuzzer.FNULL, stderr=subprocess.STDOUT,cwd=folder)
+
+	@staticmethod
+	def _cleanup(randomized):
+		for ext in ['seed','in','ans']:
+			if os.path.isfile(randomized[ext]):
+				os.remove(randomized[ext])
+
+	@staticmethod
+	def _copyusefulstuff(failpath,tmpdir,randomized,failed):
+		if failpath is not None:		
+			for ext in ['seed','in','ans']:
+				dest = os.path.join(failpath,"fail" + str(failed) + "." + ext)
+				shutil.copy(randomized[ext], dest)
+			output = os.path.join(tmpdir,"output")
+			if os.path.isfile(output):
+				outputdest = os.path.join(failpath,"fail" + str(failed) + ".out")
+				shutil.copy(output, outputdest)
+			feedbackdir = os.path.join(tmpdir,"lastfeedback")
+			judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
+			if os.path.isfile(judgemessage):
+				judgemessagedest = os.path.join(failpath,"fail" + str(failed) + ".judgemessage")
+				shutil.copy(judgemessage, judgemessagedest)
+			diffposition = os.path.join(feedbackdir,"diffposition.txt")
+			if os.path.isfile(diffposition):
+				diffpositiondest = os.path.join(failpath,"fail" + str(failed) + ".diffposition")
+				shutil.copy(diffposition, diffpositiondest)
+
+
 	@staticmethod
 	def runRandomCase(args, logger):
 		args.bail_on_error=False
@@ -40,105 +73,158 @@ class Fuzzer:
 		ProblemAspect.silent=True
 
 		with Problem(args.problemdir) as prob:
-			datadir = os.path.join(prob.probdir, 'data')
-			secretdir = os.path.join(datadir, 'secret')
-			casefile = os.path.join(secretdir,args.case + '.seed')
+			randomized={}
+			try:
+				datadir = os.path.join(prob.probdir, 'data')
+				secretdir = os.path.join(datadir, 'secret')
+				casefile = os.path.join(secretdir,args.case + '.seed')
 
-			if not os.path.isfile(casefile):
-				logger.error('Could not locate seed file %s' % (casefile))
-				return
-
-			if args.failpath is not None:
-				if not os.path.isdir(args.failpath):
-					logger.error('fail destination is not a directory')
-					return
-				if not os.access(args.failpath, os.W_OK):
-					logger.error('could not write to fail destination')
+				if not os.path.isfile(casefile):
+					logger.error('Could not locate seed file %s' % (casefile))
 					return
 
-			program = Program(os.path.realpath(args.solution), prob.tmpdir)
-			logger.info('Compiling program %s' % (program.name))
+				if args.failpath is not None:
+					if not os.path.isdir(args.failpath):
+						logger.error('fail destination is not a directory')
+						return
+					if not os.access(args.failpath, os.W_OK):
+						logger.error('could not write to fail destination')
+						return
+					failpathWA=os.path.join(args.failpath,"wa")
+					failpathRTE=os.path.join(args.failpath,"rte")
+					os.mkdir(failpathWA)
+					os.mkdir(failpathRTE)
 
-			if not program.compile():
-				logger.error('Compile error for program %s' % (program.name))
-				return
+				program = Program(os.path.realpath(args.solution), prob.tmpdir)
+				logger.info('Compiling program %s' % (program.name))
+
+				if not program.compile():
+					logger.error('Compile error for program %s' % (program.name))
+					return
 
 
-			#prepare the things we will need
-			logger.info("preparing")
-			subprocess.call(["make","generator"])
-			subprocess.call(["make","anysolution"])
+				#prepare the things we will need
+				logger.info("preparing")
+				Fuzzer._callmake(prob.probdir,"generator")
+				Fuzzer._callmake(prob.probdir,"anysolution")
 
-			FNULL = open(os.devnull, 'w')
+				FNULL = open(os.devnull, 'w')
 
-			failed=0
-			logger.info('finished %s runs of %s on %s (%s failed)' % (0,args.runs, args.case, 0))
-			for i in range(args.runs):
-				seed=str(random.getrandbits(63))
-				randomized={}
-				for ext in ['seed','in','ans']:
-					randomized[ext] = os.path.join(secretdir,args.case + "_" + seed + "." + ext)
+				failedWA=0
+				failedRTE=0
+				logger.info('finished %s runs of %s on %s (%s failed)' % (0,args.runs, args.case, 0))
+				for i in range(args.runs):
+					seed=str(random.getrandbits(63))
+					randomized={}
+					for ext in ['seed','in','ans']:
+						randomized[ext] = os.path.join(secretdir,args.case + "_" + seed + "." + ext)
 
-				logger.debug("randomizing %s"%(args.case))
-				Fuzzer._randomizeCase(casefile,randomized["seed"],Fuzzer.RANDOMIZED_CASES,seed)
-				#generate in and out file
-				subprocess.call(["make",randomized["in"]],stdout=FNULL, stderr=subprocess.STDOUT)
-				subprocess.call(["make",randomized["ans"]],stdout=FNULL, stderr=subprocess.STDOUT)
-				#update testdata
-				testdata = TestCaseGroup(prob, os.path.join(prob.probdir, 'data'))
-				
-				#run problemtools
-				logger.debug("preparing and running problem tools")
-				args.data_filter=re_argument(args.case +"_" + seed)
-				(result1, result2) = testdata.run_submission(program,args)
-
-				if str(result1)[:2] != 'AC':
-					logger.debug("found problematic input, picking failing case")
-					feedbackdir = os.path.join(prob.tmpdir,"lastfeedback")
-					judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
-					case = Picker.pickcase(randomized["in"],Picker.firstfailingcase(judgemessage,randomized["ans"]))
-					with open(randomized["in"],'w+') as f:
-						f.write("1\n")
-						for line in case:
-							f.write(line)
-					subprocess.call(["make",randomized["ans"]],stdout=FNULL, stderr=subprocess.STDOUT)
+					logger.debug("randomizing %s"%(args.case))
+					Fuzzer._randomizeCase(casefile,randomized["seed"],Fuzzer.RANDOMIZED_CASES,seed)
+					#generate in and out file
+					Fuzzer._callmake(prob.probdir,randomized["in"])
+					Fuzzer._callmake(prob.probdir,randomized["ans"])
+					# subprocess.call(["cat",randomized["in"]])
+					#update testdata
+					testdata = TestCaseGroup(prob, os.path.join(prob.probdir, 'data'))
 					
-					logger.debug("running problem again on singular case")
+					#run problemtools
+					logger.debug("preparing and running problem tools")
+					args.data_filter=re_argument(args.case +"_" + seed)
 					(result1, result2) = testdata.run_submission(program,args)
 
-					if str(result1)[:2] != 'AC':
-						failed += 1
-						if args.failpath is not None:
-							for ext in ['seed','in','ans']:
-								dest = os.path.join(args.failpath,"fail" + str(failed) + "." + ext)
-								shutil.copy(randomized[ext], dest)
-							output = os.path.join(prob.tmpdir,"output")
-							outputdest = os.path.join(args.failpath,"fail" + str(failed) + ".out")
-							shutil.copy(output, outputdest)
-							judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
-							judgemessagedest = os.path.join(args.failpath,"fail" + str(failed) + ".judgemessage")
-							shutil.copy(judgemessage, judgemessagedest)
-							diffposition = os.path.join(feedbackdir,"diffposition.txt")
-							if os.path.isfile(diffposition):
-								diffpositiondest = os.path.join(args.failpath,"fail" + str(failed) + ".diffposition")
-								shutil.copy(diffposition, diffpositiondest)
-						else:
-							logger.info("found failing case:")
-							with open(randomized['in']) as f:
-								for line in f.readlines():
-									logger.info(line)
-					else :
-						print "Solution has feedback errors between test cases"
-						return
-				
-				logger.info('finished %s runs of %s on %s (%s failed)' % (i+1,args.runs, args.case, failed))
-				
-				for ext in ['seed','in','ans']:
-					os.remove(randomized[ext])
+					if str(result1)[:2] == 'WA':
+						logger.debug("found problematic input, picking failing case")
+						feedbackdir = os.path.join(prob.tmpdir,"lastfeedback")
+						judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
+						case = Picker.pickcase(randomized["in"],Picker.firstfailingcase(judgemessage,randomized["ans"]))
+						with open(randomized["in"],'w+') as f:
+							for line in case:
+								f.write(line)
+						Fuzzer._callmake(prob.probdir,randomized["ans"])
+						
+						logger.debug("running program again on singular case")
+						(result1, result2) = testdata.run_submission(program,args)
 
-				if failed >= Fuzzer.MAX_FAILS:
-					logger.info('enough runs failed, ending run')
-					return
+						if str(result1)[:2] == 'WA':
+							failedWA += 1
+							if args.failpath is not None:
+								Fuzzer._copyusefulstuff(failpathWA,prog.tmpdir,randomized,failedWA)
+							else:
+								logger.info("found failing case:")
+								with open(randomized['in']) as f:
+									for line in f.readlines():
+										logger.info(line)
+						else :
+							logger.info("Program has feedback errors between test cases")
+							return
+							
+					elif str(result1)[:2] == 'TL':
+						logger.info("Program hit time limit")
+						return
+					elif str(result1)[:2] == 'JE':
+						logger.info("Judge Error occurred")
+						return
+					elif str(result1)[:2] == 'RT':
+						#binary search for the error
+						logger.debug("Runtime error occurred, binary search for the test case")
+
+						firsthalf = Picker.splitcase(randomized["in"],True)
+						secondhalf = Picker.splitcase(randomized["in"],False)
+
+						while firsthalf[0]!="0\n":
+							with open(randomized["in"],'w+') as f:
+								for line in firsthalf:
+									f.write(line)
+							Fuzzer._callmake(prob.probdir,randomized["ans"])
+							
+							logger.debug("running program again on half of remainder")
+							(result1, result2) = testdata.run_submission(program,args)
+							if str(result1)[:2] == 'RT':
+								logger.debug("RTE occurred in first half")
+							else:
+								logger.debug("RTE occurred in second half")
+								with open(randomized["in"],'w+') as f:
+									for line in secondhalf:
+										f.write(line)
+							firsthalf = Picker.splitcase(randomized["in"],True)
+							secondhalf = Picker.splitcase(randomized["in"],False)
+
+						logger.debug("should have RTE case now")
+						with open(randomized["in"],'w+') as f:
+							for line in secondhalf:
+								f.write(line)
+						Fuzzer._callmake(prob.probdir,randomized["ans"])
+						
+						logger.debug("running program on RTE case")
+						(result1, result2) = testdata.run_submission(program,args)
+						if str(result1)[:2] == 'RT':
+							logger.debug("RTE binary search successful")
+							failedRTE += 1
+							if args.failpath is not None:
+								Fuzzer._copyusefulstuff(failpathRTE,prog.tmpdir,randomized,failedRTE)
+							else:
+								logger.info("found RTE case:")
+								with open(randomized['in']) as f:
+									for line in f.readlines():
+										logger.info(line)
+
+						else:
+							logger.info("RTE binary search unsuccessful, Program has feedback errors")
+							return
+
+
+					logger.info('finished %s runs of %s on %s (%s failed)' % (i+1,args.runs, args.case, failedWA+failedRTE))
+					
+					Fuzzer._cleanup(randomized)
+
+					if failedWA+failedRTE >= Fuzzer.MAX_FAILS:
+						logger.info('enough runs failed, ending run')
+						return
+
+			finally:
+				Fuzzer._cleanup(randomized)
+				Fuzzer._callmake(prob.probdir,"clean")
 
 	@staticmethod
 	def argparser():
