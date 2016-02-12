@@ -42,8 +42,9 @@ class Fuzzer:
 	@staticmethod
 	def _cleanup(randomized):
 		for ext in ['seed','in','ans']:
-			if os.path.isfile(randomized[ext]):
-				os.remove(randomized[ext])
+			if ext in randomized:
+				if os.path.isfile(randomized[ext]):
+					os.remove(randomized[ext])
 
 	@staticmethod
 	def _copyusefulstuff(failpath,tmpdir,randomized,failed):
@@ -72,6 +73,7 @@ class Fuzzer:
 		args.parts=["submissions"]
 		ProblemAspect.silent=True
 
+		Fuzzer._callmake(args.problemdir,"checker")
 		with Problem(args.problemdir) as prob:
 			randomized={}
 			try:
@@ -92,8 +94,10 @@ class Fuzzer:
 						return
 					failpathWA=os.path.join(args.failpath,"wa")
 					failpathRTE=os.path.join(args.failpath,"rte")
-					os.mkdir(failpathWA)
-					os.mkdir(failpathRTE)
+					if not os.path.isdir(args.failpath):
+						os.mkdir(failpathWA)
+					if not os.path.isdir(args.failpath):
+						os.mkdir(failpathRTE)
 
 				program = Program(os.path.realpath(args.solution), prob.tmpdir)
 				logger.info('Compiling program %s' % (program.name))
@@ -107,7 +111,8 @@ class Fuzzer:
 				logger.info("preparing")
 				Fuzzer._callmake(prob.probdir,"generator")
 				Fuzzer._callmake(prob.probdir,"anysolution")
-
+				
+				picker = None
 				FNULL = open(os.devnull, 'w')
 
 				failedWA=0
@@ -124,6 +129,8 @@ class Fuzzer:
 					#generate in and out file
 					Fuzzer._callmake(prob.probdir,randomized["in"])
 					Fuzzer._callmake(prob.probdir,randomized["ans"])
+					if picker is None:
+						picker=Picker(randomized["in"])
 					# subprocess.call(["cat",randomized["in"]])
 					#update testdata
 					testdata = TestCaseGroup(prob, os.path.join(prob.probdir, 'data'))
@@ -137,7 +144,7 @@ class Fuzzer:
 						logger.debug("found problematic input, picking failing case")
 						feedbackdir = os.path.join(prob.tmpdir,"lastfeedback")
 						judgemessage = os.path.join(feedbackdir,"judgemessage.txt")
-						case = Picker.pickcase(randomized["in"],Picker.firstfailingcase(judgemessage,randomized["ans"]))
+						case = picker.pickcase(randomized["in"],Picker.firstfailingcase(judgemessage,randomized["ans"]))
 						with open(randomized["in"],'w+') as f:
 							for line in case:
 								f.write(line)
@@ -146,17 +153,19 @@ class Fuzzer:
 						logger.debug("running program again on singular case")
 						(result1, result2) = testdata.run_submission(program,args)
 
+						failedWA += 1
 						if str(result1)[:2] == 'WA':
-							failedWA += 1
 							if args.failpath is not None:
-								Fuzzer._copyusefulstuff(failpathWA,prog.tmpdir,randomized,failedWA)
+								Fuzzer._copyusefulstuff(failpathWA,prob.tmpdir,randomized,failedWA)
 							else:
 								logger.info("found failing case:")
 								with open(randomized['in']) as f:
 									for line in f.readlines():
 										logger.info(line)
 						else :
-							logger.info("Program has feedback errors between test cases")
+							logger.info("Program has feedback errors between test cases (or outputs something after the correct answer)")
+							if args.failpath is not None:
+								Fuzzer._copyusefulstuff(failpathWA,prob.tmpdir,randomized,failedWA)
 							return
 							
 					elif str(result1)[:2] == 'TL':
@@ -169,8 +178,8 @@ class Fuzzer:
 						#binary search for the error
 						logger.debug("Runtime error occurred, binary search for the test case")
 
-						firsthalf = Picker.splitcase(randomized["in"],True)
-						secondhalf = Picker.splitcase(randomized["in"],False)
+						firsthalf = picker.splitcase(randomized["in"],True)
+						secondhalf = picker.splitcase(randomized["in"],False)
 
 						while firsthalf[0]!="0\n":
 							with open(randomized["in"],'w+') as f:
@@ -187,8 +196,8 @@ class Fuzzer:
 								with open(randomized["in"],'w+') as f:
 									for line in secondhalf:
 										f.write(line)
-							firsthalf = Picker.splitcase(randomized["in"],True)
-							secondhalf = Picker.splitcase(randomized["in"],False)
+							firsthalf = picker.splitcase(randomized["in"],True)
+							secondhalf = picker.splitcase(randomized["in"],False)
 
 						logger.debug("should have RTE case now")
 						with open(randomized["in"],'w+') as f:
@@ -198,11 +207,12 @@ class Fuzzer:
 						
 						logger.debug("running program on RTE case")
 						(result1, result2) = testdata.run_submission(program,args)
+						
+						failedRTE += 1
 						if str(result1)[:2] == 'RT':
 							logger.debug("RTE binary search successful")
-							failedRTE += 1
 							if args.failpath is not None:
-								Fuzzer._copyusefulstuff(failpathRTE,prog.tmpdir,randomized,failedRTE)
+								Fuzzer._copyusefulstuff(failpathRTE,prob.tmpdir,randomized,failedRTE)
 							else:
 								logger.info("found RTE case:")
 								with open(randomized['in']) as f:
@@ -211,6 +221,8 @@ class Fuzzer:
 
 						else:
 							logger.info("RTE binary search unsuccessful, Program has feedback errors")
+							if args.failpath is not None:
+								Fuzzer._copyusefulstuff(failpathRTE,prob.tmpdir,randomized,failedRTE)
 							return
 
 
@@ -244,7 +256,6 @@ class Fuzzer:
 
 
 if __name__ == '__main__':
-	args = Fuzzer.default_args()
 	args = Fuzzer.argparser().parse_args()
 	#args.data_filter=re.compile(".*")
 	args.data_filter=re.compile("data/" + args.case + "$")

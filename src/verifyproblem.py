@@ -927,6 +927,8 @@ class OutputValidators(ProblemAspect):
     def validate(self, testcase, submission_output, errorhandler):
         res = SubmissionResult('JE')
         lastfeedback=os.path.join(self._problem.tmpdir,"lastfeedback")
+        if os.path.isdir(lastfeedback):
+            shutil.rmtree(lastfeedback)
         for val in self._actual_validators():
             if val is not None and val.compile():
                 feedbackdir = tempfile.mkdtemp(prefix='feedback', dir=self._problem.tmpdir)
