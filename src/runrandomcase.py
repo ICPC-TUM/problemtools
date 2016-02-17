@@ -94,9 +94,9 @@ class Fuzzer:
 						return
 					failpathWA=os.path.join(args.failpath,"wa")
 					failpathRTE=os.path.join(args.failpath,"rte")
-					if not os.path.isdir(args.failpath):
+					if not os.path.isdir(failpathWA):
 						os.mkdir(failpathWA)
-					if not os.path.isdir(args.failpath):
+					if not os.path.isdir(failpathRTE):
 						os.mkdir(failpathRTE)
 
 				program = Program(os.path.realpath(args.solution), prob.tmpdir)
