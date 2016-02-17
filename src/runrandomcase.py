@@ -156,7 +156,12 @@ class Fuzzer:
 						failedWA += 1
 						if str(result1)[:2] == 'WA':
 							if args.failpath is not None:
-								Fuzzer._copyusefulstuff(failpathWA,prob.tmpdir,randomized,failedWA)
+								faildir=os.path.join(failpathWA,"fail" + failedWA)
+								if (os.isdir(faildir)):
+									log.error("%s already exists" % faildir)
+									return
+								os.mkdir(faildir)
+								Fuzzer._copyusefulstuff(faildir,prob.tmpdir,randomized,failedWA)
 							else:
 								logger.info("found failing case:")
 								with open(randomized['in']) as f:
@@ -165,7 +170,13 @@ class Fuzzer:
 						else :
 							logger.info("Program has feedback errors between test cases (or outputs something after the correct answer)")
 							if args.failpath is not None:
-								Fuzzer._copyusefulstuff(failpathWA,prob.tmpdir,randomized,failedWA)
+								faildir=os.path.join(failpathWA,"fail" + failedWA)
+								if (os.isdir(faildir)):
+									log.error("%s already exists" % faildir)
+									return
+								os.mkdir(faildir)
+
+								Fuzzer._copyusefulstuff(faildir,prob.tmpdir,randomized,failedWA)
 							return
 							
 					elif str(result1)[:2] == 'TL':
@@ -212,7 +223,13 @@ class Fuzzer:
 						if str(result1)[:2] == 'RT':
 							logger.debug("RTE binary search successful")
 							if args.failpath is not None:
-								Fuzzer._copyusefulstuff(failpathRTE,prob.tmpdir,randomized,failedRTE)
+								faildir=os.path.join(failpathRTE,"fail" + failedRTE)
+								if (os.isdir(faildir)):
+									log.error("%s already exists" % faildir)
+									return
+								os.mkdir(faildir)
+
+								Fuzzer._copyusefulstuff(faildir,prob.tmpdir,randomized,failedRTE)
 							else:
 								logger.info("found RTE case:")
 								with open(randomized['in']) as f:
@@ -222,6 +239,12 @@ class Fuzzer:
 						else:
 							logger.info("RTE binary search unsuccessful, Program has feedback errors")
 							if args.failpath is not None:
+								faildir=os.path.join(failpathRTE,"fail" + failedRTE)
+								if (os.isdir(faildir)):
+									log.error("%s already exists" % faildir)
+									return
+								os.mkdir(faildir)
+
 								Fuzzer._copyusefulstuff(failpathRTE,prob.tmpdir,randomized,failedRTE)
 							return
 
