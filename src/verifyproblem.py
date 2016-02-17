@@ -1061,6 +1061,7 @@ class Problem(ProblemAspect):
         return self
 
     def __exit__(self, type, value, traceback):
+        return
         shutil.rmtree(self.tmpdir)
 
     def __str__(self):
