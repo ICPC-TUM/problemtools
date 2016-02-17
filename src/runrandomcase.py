@@ -156,8 +156,8 @@ class Fuzzer:
 						failedWA += 1
 						if str(result1)[:2] == 'WA':
 							if args.failpath is not None:
-								faildir=os.path.join(failpathWA,"fail" + failedWA)
-								if (os.isdir(faildir)):
+								faildir=os.path.join(failpathWA,"fail" + str(failedWA))
+								if os.path.isdir(faildir):
 									log.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
@@ -170,8 +170,8 @@ class Fuzzer:
 						else :
 							logger.info("Program has feedback errors between test cases (or outputs something after the correct answer)")
 							if args.failpath is not None:
-								faildir=os.path.join(failpathWA,"fail" + failedWA)
-								if (os.isdir(faildir)):
+								faildir=os.path.join(failpathWA,"fail" + str(failedWA))
+								if os.path.isdir(faildir):
 									log.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
@@ -223,8 +223,8 @@ class Fuzzer:
 						if str(result1)[:2] == 'RT':
 							logger.debug("RTE binary search successful")
 							if args.failpath is not None:
-								faildir=os.path.join(failpathRTE,"fail" + failedRTE)
-								if (os.isdir(faildir)):
+								faildir=os.path.join(failpathRTE,"fail" + str(failedRTE))
+								if os.path.isdir(faildir):
 									log.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
@@ -239,8 +239,8 @@ class Fuzzer:
 						else:
 							logger.info("RTE binary search unsuccessful, Program has feedback errors")
 							if args.failpath is not None:
-								faildir=os.path.join(failpathRTE,"fail" + failedRTE)
-								if (os.isdir(faildir)):
+								faildir=os.path.join(failpathRTE,"fail" + str(failedRTE))
+								if os.path.isdir(faildir):
 									log.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
