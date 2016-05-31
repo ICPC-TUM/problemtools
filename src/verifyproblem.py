@@ -702,6 +702,9 @@ class InputFormatValidators(ProblemAspect):
                     with open('errors', 'r') as fin: logging.info(fin.read())
                 if os.path.isfile('errors'):
                     os.remove('errors')
+            else:
+                self.error('Compile error for input format validators %s' % val.name)
+                self._validators.remove(val)
 
 
 class Graders(ProblemAspect):
