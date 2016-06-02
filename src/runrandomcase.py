@@ -14,7 +14,7 @@ from pickcase import Picker
 from timeit import default_timer as timer
 
 class Fuzzer:
-	RANDOMIZED_CASES=50
+	RANDOMIZED_CASES=500
 	MAX_FAILS = 5
 
 	@staticmethod
@@ -158,7 +158,7 @@ class Fuzzer:
 							if args.failpath is not None:
 								faildir=os.path.join(failpathWA,"fail" + str(failedWA))
 								if os.path.isdir(faildir):
-									log.error("%s already exists" % faildir)
+									logger.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
 								Fuzzer._copyusefulstuff(faildir,prob.tmpdir,randomized,failedWA)
@@ -172,7 +172,7 @@ class Fuzzer:
 							if args.failpath is not None:
 								faildir=os.path.join(failpathWA,"fail" + str(failedWA))
 								if os.path.isdir(faildir):
-									log.error("%s already exists" % faildir)
+									logger.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
 
@@ -225,7 +225,7 @@ class Fuzzer:
 							if args.failpath is not None:
 								faildir=os.path.join(failpathRTE,"fail" + str(failedRTE))
 								if os.path.isdir(faildir):
-									log.error("%s already exists" % faildir)
+									logger.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
 
@@ -241,7 +241,7 @@ class Fuzzer:
 							if args.failpath is not None:
 								faildir=os.path.join(failpathRTE,"fail" + str(failedRTE))
 								if os.path.isdir(faildir):
-									log.error("%s already exists" % faildir)
+									logger.error("%s already exists" % faildir)
 									return
 								os.mkdir(faildir)
 
