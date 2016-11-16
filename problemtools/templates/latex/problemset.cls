@@ -49,7 +49,7 @@
 %\RequirePackage{fullpage}        % Set up margins for full page
 \RequirePackage{url}              % Urls
 \RequirePackage[normalem]{ulem}   % \sout
-\RequirePackage[colorlinks=true,implicit=false]{hyperref}
+\RequirePackage[urlcolor=black,colorlinks=true,implicit=false]{hyperref}
 \ifplastex\else
 \RequirePackage{pgffor}
 \fi
