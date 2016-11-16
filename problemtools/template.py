@@ -20,7 +20,7 @@ class Template:
     copy_cls = True
 
     def __init__(self, problemdir, language='',
-                 title='Problem Title', force_copy_cls=False):
+                 title='Problem Title', solution=False, force_copy_cls=False):
         if not os.path.isdir(problemdir):
             raise Exception('%s is not a directory' % problemdir)
 
@@ -55,14 +55,12 @@ class Template:
         if not os.path.isfile(problemtex):
             raise Exception('Unable to find problem statement, was looking for "%s"' % problemtex)
 
-        templatefile = 'template.tex'
-        clsfile = 'problemset.cls'
-        timelim = 1  # Legacy for compatibility with v0.1
-        version = detect_version(problemdir, problemtex)
-        if version != '':
-            print 'Note: problem is in an old version (%s) of problem format, you should consider updating it' % version
-            templatefile = 'template_%s.tex' % version
-            clsfile = 'problemset_%s.cls' % version
+        if not solution:
+            templatefile = 'template.tex'
+            clsfile = 'problemset.cls'
+        else:
+            templatefile = 'template_sol.tex'
+            clsfile = 'solution.cls'
 
         templatepaths = [os.path.join(os.path.dirname(__file__), 'templates/latex'),
                          os.path.join(os.path.dirname(__file__), '../templates/latex'),
@@ -79,7 +77,8 @@ class Template:
         basedir = os.path.dirname(problemdir)
         shortname = os.path.basename(problemdir)
         samples = [os.path.splitext(os.path.basename(f))[0] for f in sorted(glob.glob(os.path.join(problemdir, 'data', 'sample', '*.in')))]
-        self.problemset_cls = os.path.join(basedir, 'problemset.cls')
+
+        self.problemset_cls = os.path.join(basedir, clsfile)
 
         if os.path.isfile(self.problemset_cls) and not force_copy_cls:
             print '%s exists, will not copy it -- in case of weirdness this is likely culprit' % self.problemset_cls
@@ -90,6 +89,7 @@ class Template:
 
         (templout, self.filename) = tempfile.mkstemp(suffix='.tex', dir=basedir)
         templin = open(os.path.join(templatepath, templatefile))
+
         for line in templin:
             try:
                 out = line % locals()

@@ -189,13 +189,17 @@ class TestCase(ProblemAspect):
         if self._problem.is_interactive:
             res2 = self._problem.output_validators.validate_interactive(self, sub, timelim_high, self._problem.submissions)
         else:
-            status, runtime = sub.run(self.infile, outfile, timelim=timelim_high+1)
+            status, runtime = sub.run(self.infile, outfile, timelim=timelim_high+1, errfile='errors')
             if is_TLE(status) or runtime > timelim_high:
                 res2 = SubmissionResult('TLE', score=self._problem.config.get('grading')['reject_score'])
             elif is_RTE(status):
                 res2 = SubmissionResult('RTE', score=self._problem.config.get('grading')['reject_score'])
+                logging.info('Error output of the submission:')
+                with open('errors', 'r') as fin: logging.info(fin.read())
             else:
                 res2 = self._problem.output_validators.validate(self, outfile)
+            if os.path.isfile('errors'):
+                os.remove('errors')
             res2.runtime = runtime
         if sys.stdout.isatty():
             sys.stdout.write('%s' % '\b' * (len(msg)))
@@ -599,11 +603,18 @@ class ProblemStatement(ProblemAspect):
             htmlopt.language = lang
             pdf_ok = True
             try:
+                pdfopt.solution=False
                 if not problem2pdf.convert(self._problem.probdir, pdfopt):
                     langparam = ''
                     if lang != '':
                         langparam = '-l ' + lang
                     self.error('Could not compile problem statement for language "%s".  Run problem2pdf %s on the problem to diagnose.' % (lang, langparam))
+                pdfopt.solution=True
+                if not problem2pdf.convert(self._problem.probdir, pdfopt):
+                    langparam = ''
+                    if lang != '':
+                        langparam = '-l ' + lang
+                    self.error('Could not compile solution language "%s".  Run problem2pdf -solution %s on the problem to diagnose.' % (lang, langparam))
             except Exception as e:
                 self.error('Error raised when checking problem statement for language %s:\n%s' % (lang, e))
             if not pdf_ok:
@@ -713,9 +724,14 @@ class InputFormatValidators(ProblemAspect):
             status, _ = val.run(testcase.infile, args=flags)
             if not os.WIFEXITED(status):
                 testcase.error('Input format validator %s crashed on input %s' % (val, testcase.infile))
+                testcase.info('Error output of the validator:')
+                with open('errors', 'r') as fin: testcase.info(fin.read())
             if os.WEXITSTATUS(status) != 42:
                 testcase.error('Input format validator %s did not accept input %s, exit code: %d' % (val, testcase.infile, os.WEXITSTATUS(status)))
-
+                testcase.info('Error output of the validator:')
+                with open('errors', 'r') as fin: testcase.info(fin.read())
+                if os.path.isfile('errors'):
+                    os.remove('errors')
 
 class Graders(ProblemAspect):
     _default_grader = run.get_tool('default_grader')
@@ -883,6 +899,8 @@ class OutputValidators(ProblemAspect):
         if ret == 43:
             if score is None:
                 score = self._problem.config.get('grading')['reject_score']
+            logging.info('Error output of the validator:')
+            with open(os.path.join(feedbackdir, 'judgemessage.txt'), 'r') as fin: logging.info(fin.read())
             return SubmissionResult('WA', score=score)
         if score is None:
             score = self._problem.config.get('grading')['accept_score']
