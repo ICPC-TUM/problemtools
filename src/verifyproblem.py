@@ -1,5 +1,6 @@
 #! /usr/bin/env python2
 # -*- coding: utf-8 -*-
+
 import glob
 import string
 import hashlib
@@ -927,6 +928,7 @@ class Submissions(ProblemAspect):
         ['WA', 'wrong_answer', False],
         ['RTE', 'run_time_error', False],
         ['TLE', 'time_limit_exceeded', False],
+        ['SL', 'slow', False]
         ]
 
     def __init__(self, problem):
@@ -947,6 +949,9 @@ class Submissions(ProblemAspect):
     def check_submission(self, sub, args, expected_verdict, timelim_low, timelim_high):
         (result1, result2) = self._problem.testdata.run_submission(sub, args, timelim_low, timelim_high)
 
+        if expected_verdict == 'SL':
+            expected_verdict = 'AC'
+
         if result1.verdict != result2.verdict:
             self.warning('%s submission %s sensitive to time limit: limit of %s secs -> %s, limit of %s secs -> %s' % (expected_verdict, sub.name, timelim_low, result1.verdict, timelim_high, result2.verdict))
 
@@ -963,8 +968,8 @@ class Submissions(ProblemAspect):
             return self._check_res
         self._check_res = True
 
-        timelim_margin = 300  # 5 minutes
-        timelim = 300
+        max_timelim_margin, max_timelim = 500, 500
+        timelim_margin, timelim = max_timelim_margin, max_timelim  # 5 minutes
         if 'time_for_AC_submissions' in self._problem.config.get('limits'):
             timelim = timelim_margin = self._problem.config.get('limits')['time_for_AC_submissions']
         if args.fixed_timelim is not None:
@@ -986,7 +991,10 @@ class Submissions(ProblemAspect):
                         self.error('Compile error for %s submission %s' % (acr, sub.name))
                         continue
 
-                    res = self.check_submission(sub, args, acr, timelim, timelim_margin)
+                    if acr == 'SL':
+                        res = self.check_submission(sub, args, acr, max_timelim, max_timelim_margin)
+                    else:
+                        res = self.check_submission(sub, args, acr, timelim, timelim_margin)
                     runtimes.append(res.runtime)
 
             if acr == 'AC':
