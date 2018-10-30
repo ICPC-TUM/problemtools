@@ -18,7 +18,7 @@ class Picker:
 			cases=int(f.readline())
 			if cases < 3:
 				raise LayoutError("Given test case does not have at least 3 cases")
-				
+
 			if not empty in [0,1,cases-1,cases]:
 				raise LayoutError("could not deduce testcase layout")
 			self.preamble = False

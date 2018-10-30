@@ -48,7 +48,7 @@ class Fuzzer:
 
 	@staticmethod
 	def _copyusefulstuff(failpath,tmpdir,randomized,failed):
-		if failpath is not None:		
+		if failpath is not None:
 			for ext in ['seed','in','ans']:
 				dest = os.path.join(failpath,"fail" + str(failed) + "." + ext)
 				shutil.copy(randomized[ext], dest)
@@ -68,10 +68,15 @@ class Fuzzer:
 
 
 	@staticmethod
-	def runRandomCase(args, logger):
+	def runRandomCase(args, logger, timelimit_low=None, timelimit_high=None):
 		args.bail_on_error=False
 		args.parts=["submissions"]
 		ProblemAspect.silent=True
+
+		if timelimit_low is None and timelimit_high is not None:
+			timelimit_low = timelimit_high
+		if timelimit_low is not None and timelimit_high is None:
+			timelimit_high = timelimit_low
 
 		Fuzzer._callmake(args.problemdir,"checker")
 		with Problem(args.problemdir) as prob:
@@ -111,7 +116,7 @@ class Fuzzer:
 				logger.info("preparing")
 				Fuzzer._callmake(prob.probdir,"generator")
 				Fuzzer._callmake(prob.probdir,"anysolution")
-				
+
 				picker = None
 				FNULL = open(os.devnull, 'w')
 
@@ -134,11 +139,18 @@ class Fuzzer:
 					# subprocess.call(["cat",randomized["in"]])
 					#update testdata
 					testdata = TestCaseGroup(prob, os.path.join(prob.probdir, 'data'))
-					
+
 					#run problemtools
 					logger.debug("preparing and running problem tools")
 					args.data_filter=re_argument(args.case +"_" + seed)
-					(result1, result2) = testdata.run_submission(program,args)
+
+
+					def run(program, args):
+						if timelimit_low is None:
+							return testdata.run_submission(program, args)
+						return testdata.run_submission(program, args, timelimit_low, timelimit_high)
+
+					(result1, result2) = run(program, args)
 
 					if str(result1)[:2] == 'WA':
 						logger.debug("found problematic input, picking failing case")
@@ -149,9 +161,9 @@ class Fuzzer:
 							for line in case:
 								f.write(line)
 						Fuzzer._callmake(prob.probdir,randomized["ans"])
-						
+
 						logger.debug("running program again on singular case")
-						(result1, result2) = testdata.run_submission(program,args)
+						(result1, result2) = run(program, args)
 
 						failedWA += 1
 						if str(result1)[:2] == 'WA':
@@ -167,7 +179,7 @@ class Fuzzer:
 								with open(randomized['in']) as f:
 									for line in f.readlines():
 										logger.info(line)
-						else :
+						else:
 							logger.info("Program has feedback errors between test cases (or outputs something after the correct answer)")
 							if args.failpath is not None:
 								faildir=os.path.join(failpathWA,"fail" + str(failedWA))
@@ -178,7 +190,6 @@ class Fuzzer:
 
 								Fuzzer._copyusefulstuff(faildir,prob.tmpdir,randomized,failedWA)
 							return
-							
 					elif str(result1)[:2] == 'TL':
 						logger.info("Program hit time limit")
 						return
@@ -197,7 +208,7 @@ class Fuzzer:
 								for line in firsthalf:
 									f.write(line)
 							Fuzzer._callmake(prob.probdir,randomized["ans"])
-							
+
 							logger.debug("running program again on half of remainder")
 							(result1, result2) = testdata.run_submission(program,args)
 							if str(result1)[:2] == 'RT':
