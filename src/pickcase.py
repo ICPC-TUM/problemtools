@@ -113,7 +113,7 @@ class Picker:
 			cases=int(f.readline())
 
 			if caseno < 1 or caseno > cases:
-				print "invalid case number"
+				print "invalid case number: %d out of %d" % (caseno, cases)
 				return []
 
 			ret = ["1\n"]
