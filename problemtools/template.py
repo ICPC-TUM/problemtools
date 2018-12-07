@@ -56,8 +56,12 @@ class Template:
         if not os.path.isfile(problemtex):
             raise Exception('Unable to find problem statement, was looking for "%s"' % problemtex)
 
-        templatefile = 'template.tex'
-        clsfile = 'problemset.cls'
+        if not solution:
+            templatefile = 'template.tex'
+            clsfile = 'problemset.cls'
+        else:
+            templatefile = 'template_sol.tex'
+            clsfile = 'solution.cls'
         timelim = 1  # Legacy for compatibility with v0.1
         version = detect_version(problemdir, problemtex)
         if version != '':
