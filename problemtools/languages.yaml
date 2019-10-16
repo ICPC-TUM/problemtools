@@ -213,7 +213,7 @@ scala:
 
 julia:
     name: 'Julia'
-    priority: 500
+    priority: 440
     files: '*.jl *.julia'
-    compile: 'true'
-    run '/usr/bin/env julia "{mainfile}"'
+    compile: '/usr/bin/env true'
+    run: '/usr/bin/env julia "{mainfile}"'
