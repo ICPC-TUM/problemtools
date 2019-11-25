@@ -1195,8 +1195,11 @@ class OutputValidators(ProblemAspect):
                         res.runtime = sub_runtime
                         res.validator_first = (first == 'validator')
 
-                os.unlink(interactive_out)
-                shutil.rmtree(feedbackdir)
+                if not os.getenv("PROBLEMTOOLS_KEEP_TEMP", ""):
+                    os.unlink(interactive_out)
+                    shutil.rmtree(feedbackdir)
+                else:
+                    self.debug("Keeping: {} and {}".format(interactive_out,feedbackdir))
                 if res.verdict != 'AC':
                     return res
         # TODO: check that all output validators give same result
@@ -1215,7 +1218,10 @@ class OutputValidators(ProblemAspect):
                                           args=[testcase.infile, testcase.ansfile, feedbackdir] + flags,
                                           timelim=val_timelim, memlim=val_memlim)
                 res = self._parse_validator_results(val, status, feedbackdir, testcase)
-                shutil.rmtree(feedbackdir)
+                if not os.getenv("PROBLEMTOOLS_KEEP_TEMP", ""):
+                    shutil.rmtree(feedbackdir)
+                else:
+                    self.debug("Keeping: {}".format(feedbackdir))
                 if res.verdict != 'AC':
                     return res
 
@@ -1354,7 +1360,10 @@ class Problem(ProblemAspect):
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        shutil.rmtree(self.tmpdir)
+        if not os.getenv("PROBLEMTOOLS_KEEP_TEMP", ""):
+            shutil.rmtree(self.tmpdir)
+        else:
+            print("Keeping tmpdir: {}".format(self.tmpdir))
 
     def __str__(self):
         return self.shortname
