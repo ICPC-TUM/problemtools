@@ -186,6 +186,14 @@ pypy3:
     compile: '/usr/bin/env pypy3 -m py_compile {files}'
     run: '/usr/bin/env pypy3 "{mainfile}"'
 
+pypy3:
+    name: 'Python 3 (PyPy3)'
+    priority: 915
+    files: '*.py'
+    shebang: '^#!.*pypy3\b'
+    compile: '/usr/bin/env pypy3 -m py_compile {files}'
+    run: '/usr/bin/env pypy3 "{mainfile}"'
+
 python3:
     name: 'Python 3'
     priority: 900
