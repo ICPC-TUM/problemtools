@@ -232,3 +232,10 @@ julia:
     files: '*.jl *.julia'
     compile: '/usr/bin/env true'
     run: '/usr/bin/env julia "{mainfile}"'
+
+rust:
+  name: 'Rust'
+  priority: 460
+  files: '*.rs *.rust'
+  compile: '/usr/bin/env rustc -O {files} -o "{binary}"'
+  run: '{binary}'

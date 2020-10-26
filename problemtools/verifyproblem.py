@@ -571,7 +571,7 @@ class ProblemConfig(ProblemAspect):
         'keywords': '',
         'limits': {'time_multiplier': 5,
                    'time_safety_margin': 2,
-                   'memory': 1024,
+                   'memory': 1280,
                    'output': 8,
                    'compilation_time': 60,
                    'validation_time': 60,
